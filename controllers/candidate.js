@@ -128,6 +128,7 @@ const getAssessmentCounts = async (req, res) => {
     "N2B",
     "ProcessRampdown",
     "ClientRampdown",
+    "InvoiceProcessed",
     "all",
   ];
   var final = {};
@@ -240,6 +241,10 @@ const getAssessmentCounts = async (req, res) => {
       } else if (type === "TrackingTenure") {
         query = {
           select: "Tracking",
+        };
+      } else if (type === "InvoiceProcessed") {
+        query = {
+          select: "Invoice Processed",
         };
       } else if (type === "Billed") {
         query = {
@@ -498,6 +503,10 @@ const getAllByClass = async (req, res) => {
   } else if (type === "TrackingTenure") {
     query = {
       select: "Tracking",
+    };
+  } else if (type === "InvoiceProcessed") {
+    query = {
+      select: "Invoice Processed",
     };
   } else if (type === "Billed") {
     query = {
