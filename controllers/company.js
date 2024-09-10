@@ -92,109 +92,109 @@ const getCompany = async (req, res) => {
   const company = await Company.findOne({ _id: companyId })
     .populate("roles")
     .exec();
-    const uproles = await Promise.all(
-      company.roles.map(async (role) => {
-        const inProcess = await Candidate.find({
-          interviewStatus: {
-            $in: [
-              "TPP Venue",
-              "Client Venue",
-              "Virtual Interview",
-              "Pending FSR",
-              "Pending Amcat",
-              "Pending Versant",
-              "Pending Technical",
-              "Pending Typing",
-              "Pending Group Discussion",
-              "Pending Ops/Client",
-              "Pending Vice President",
-            ],
-          },
-          select: { $in: ["", null] },
-          roleId: role._id,
-        });
-        const rejected = await Candidate.find({
-          interviewStatus: {
-            $in: [
-              "Reject FSR Communication",
-              "Reject FSR Stability",
-              "Reject FSR Domain",
-              "Reject Amcat",
-              "Reject Amcat – Technical Issue",
-              "Reject Amcat Cooling Period",
-              "Reject Versant",
-              "Reject Versant – Technical Issue",
-              "Reject Versant Cooling Period",
-              "Reject Technical",
-              "Reject Typing",
-              "Reject Group Discussion",
-              "Reject Ops/Client Communication",
-              "Reject Ops/Client Stability",
-              "Reject Ops/Client Domain",
-              "Reject Vice President",
-            ],
-          },
-          select: { $in: ["", null] },
-          roleId: role._id,
-        });
-        const awaiting = await Candidate.find({
-          interviewStatus: {
-            $in: ["Select"],
-          },
-          select: { $in: ["", null] },
-          roleId: role._id,
-        });
-        const offerDrop = await Candidate.find({
-          interviewStatus: {
-            $in: ["Offer Drop"],
-          },
-          select: { $in: ["", null] },
-          roleId: role._id,
-        });
-        const joined = await Candidate.find({
-          select: {
-            $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
-          },
-          roleId: role._id,
-        });
-        const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
-        if (!access)
-          return {
-            ...role._doc,
-            inProcess: inProcess.length,
-            awaiting: awaiting.length,
-            offerDrop: offerDrop.length,
-            joined: joined.length,
-            rejected: rejected.length,
-          };
-        else
-          return {
-            ...role._doc,
-            inProcess: inProcess.filter(
-              (candidate) =>
-                String(candidate.assignedEmployee) === req.user.userid
-            ).length,
-            awaiting: awaiting.filter(
-              (candidate) =>
-                String(candidate.assignedEmployee) === req.user.userid
-            ).length,
-            offerDrop: offerDrop.filter(
-              (candidate) =>
-                String(candidate.assignedEmployee) === req.user.userid
-            ).length,
-            joined: joined.filter(
-              (candidate) =>
-                String(candidate.assignedEmployee) === req.user.userid
-            ).length,
-            rejected: rejected.filter(
-              (candidate) =>
-                String(candidate.assignedEmployee) === req.user.userid
-            ).length,
-          };
-      })
-    );
-  
-  res.status(StatusCodes.OK).json({...company._doc,roles:uproles});
+  const uproles = await Promise.all(
+    company.roles.map(async (role) => {
+      const inProcess = await Candidate.find({
+        interviewStatus: {
+          $in: [
+            "TPP Venue",
+            "Client Venue",
+            "Virtual Interview",
+            "Pending FSR",
+            "Pending Amcat",
+            "Pending Versant",
+            "Pending Technical",
+            "Pending Typing",
+            "Pending Group Discussion",
+            "Pending Ops/Client",
+            "Pending Vice President",
+          ],
+        },
+        select: { $in: ["", null] },
+        roleId: role._id,
+      });
+      const rejected = await Candidate.find({
+        interviewStatus: {
+          $in: [
+            "Reject FSR Communication",
+            "Reject FSR Stability",
+            "Reject FSR Domain",
+            "Reject Amcat",
+            "Reject Amcat – Technical Issue",
+            "Reject Amcat Cooling Period",
+            "Reject Versant",
+            "Reject Versant – Technical Issue",
+            "Reject Versant Cooling Period",
+            "Reject Technical",
+            "Reject Typing",
+            "Reject Group Discussion",
+            "Reject Ops/Client Communication",
+            "Reject Ops/Client Stability",
+            "Reject Ops/Client Domain",
+            "Reject Vice President",
+          ],
+        },
+        select: { $in: ["", null] },
+        roleId: role._id,
+      });
+      const awaiting = await Candidate.find({
+        interviewStatus: {
+          $in: ["Select"],
+        },
+        select: { $in: ["", null] },
+        roleId: role._id,
+      });
+      const offerDrop = await Candidate.find({
+        interviewStatus: {
+          $in: ["Offer Drop"],
+        },
+        select: { $in: ["", null] },
+        roleId: role._id,
+      });
+      const joined = await Candidate.find({
+        select: {
+          $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
+        },
+        roleId: role._id,
+      });
+      const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
+      if (!access)
+        return {
+          ...role._doc,
+          inProcess: inProcess.length,
+          awaiting: awaiting.length,
+          offerDrop: offerDrop.length,
+          joined: joined.length,
+          rejected: rejected.length,
+        };
+      else
+        return {
+          ...role._doc,
+          inProcess: inProcess.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          awaiting: awaiting.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          offerDrop: offerDrop.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          joined: joined.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          rejected: rejected.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+        };
+    })
+  );
+
+  res.status(StatusCodes.OK).json({ ...company._doc, roles: uproles });
 };
 const deleteCompany = async (req, res) => {
   const {
@@ -233,105 +233,109 @@ const deleteRole = async (req, res) => {
 const getCompanyUseType = async (req, res) => {
   const { companyType: companyType } = req.query;
   var query = { response: companyType };
-  if(!companyType)
-    query = {}
-  const companies = await Company.find(query)
-    .populate("roles")
-    .exec();
-  const upcompanies = await Promise.all(companies.map(async (company) => {
-    const inProcess = await Candidate.find({
-      interviewStatus: {
-        $in: [
-          "TPP Venue",
-          "Client Venue",
-          "Virtual Interview",
-          "Pending FSR",
-          "Pending Amcat",
-          "Pending Versant",
-          "Pending Technical",
-          "Pending Typing",
-          "Pending Group Discussion",
-          "Pending Ops/Client",
-          "Pending Vice President",
-        ],
-      },
-      select: { $in: ["", null] },
-      companyId: company._id,
-    });
-    const rejected = await Candidate.find({
-      interviewStatus: {
-        $in: [
-          "Reject FSR Communication",
-          "Reject FSR Stability",
-          "Reject FSR Domain",
-          "Reject Amcat",
-          "Reject Amcat – Technical Issue",
-          "Reject Amcat Cooling Period",
-          "Reject Versant",
-          "Reject Versant – Technical Issue",
-          "Reject Versant Cooling Period",
-          "Reject Technical",
-          "Reject Typing",
-          "Reject Group Discussion",
-          "Reject Ops/Client Communication",
-          "Reject Ops/Client Stability",
-          "Reject Ops/Client Domain",
-          "Reject Vice President",
-        ],
-      },
-      select: { $in: ["", null] },
-      companyId: company._id,
-    });
-    const awaiting = await Candidate.find({
-      interviewStatus: {
-        $in: ["Select"],
-      },
-      select: { $in: ["", null] },
-      companyId: company._id,
-    });
-    const offerDrop = await Candidate.find({
-      interviewStatus: {
-        $in: ["Offer Drop"],
-      },
-      select: { $in: ["", null] },
-      companyId: company._id,
-    });
-    const joined = await Candidate.find({
-      select: {
-        $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
-      },
-      companyId: company._id,
-    });
-    const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
-    if(!access)
-      return {
-        ...company._doc,
-        inProcess: inProcess.length,
-        awaiting: awaiting.length,
-        offerDrop: offerDrop.length,
-        joined: joined.length,
-        rejected: rejected.length,
-      };
-    else
-    return {
-      ...company._doc,
-      inProcess: inProcess.filter(
-        (candidate) => String(candidate.assignedEmployee) === req.user.userid
-      ).length,
-      awaiting: awaiting.filter(
-        (candidate) => String(candidate.assignedEmployee) === req.user.userid
-      ).length,
-      offerDrop: offerDrop.filter(
-        (candidate) => String(candidate.assignedEmployee) === req.user.userid
-      ).length,
-      joined: joined.filter(
-        (candidate) => String(candidate.assignedEmployee) === req.user.userid
-      ).length,
-      rejected: rejected.filter(
-        (candidate) => String(candidate.assignedEmployee) === req.user.userid
-      ) .length,
-    };
-  }));
+  if (!companyType) query = {};
+  const companies = await Company.find(query).populate("roles").exec();
+  const upcompanies = await Promise.all(
+    companies.map(async (company) => {
+      const inProcess = await Candidate.find({
+        interviewStatus: {
+          $in: [
+            "TPP Venue",
+            "Client Venue",
+            "Virtual Interview",
+            "Pending FSR",
+            "Pending Amcat",
+            "Pending Versant",
+            "Pending Technical",
+            "Pending Typing",
+            "Pending Group Discussion",
+            "Pending Ops/Client",
+            "Pending Vice President",
+          ],
+        },
+        select: { $in: ["", null] },
+        companyId: company._id,
+      });
+      const rejected = await Candidate.find({
+        interviewStatus: {
+          $in: [
+            "Reject FSR Communication",
+            "Reject FSR Stability",
+            "Reject FSR Domain",
+            "Reject Amcat",
+            "Reject Amcat – Technical Issue",
+            "Reject Amcat Cooling Period",
+            "Reject Versant",
+            "Reject Versant – Technical Issue",
+            "Reject Versant Cooling Period",
+            "Reject Technical",
+            "Reject Typing",
+            "Reject Group Discussion",
+            "Reject Ops/Client Communication",
+            "Reject Ops/Client Stability",
+            "Reject Ops/Client Domain",
+            "Reject Vice President",
+          ],
+        },
+        select: { $in: ["", null] },
+        companyId: company._id,
+      });
+      const awaiting = await Candidate.find({
+        interviewStatus: {
+          $in: ["Select"],
+        },
+        select: { $in: ["", null] },
+        companyId: company._id,
+      });
+      const offerDrop = await Candidate.find({
+        interviewStatus: {
+          $in: ["Offer Drop"],
+        },
+        select: { $in: ["", null] },
+        companyId: company._id,
+      });
+      const joined = await Candidate.find({
+        select: {
+          $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
+        },
+        companyId: company._id,
+      });
+      const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
+      if (!access)
+        return {
+          ...company._doc,
+          inProcess: inProcess.length,
+          awaiting: awaiting.length,
+          offerDrop: offerDrop.length,
+          joined: joined.length,
+          rejected: rejected.length,
+        };
+      else
+        return {
+          ...company._doc,
+          inProcess: inProcess.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          awaiting: awaiting.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          offerDrop: offerDrop.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          joined: joined.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+          rejected: rejected.filter(
+            (candidate) =>
+              String(candidate.assignedEmployee) === req.user.userid
+          ).length,
+        };
+    })
+  );
   res.status(StatusCodes.OK).json(upcompanies);
 };
 
@@ -344,7 +348,7 @@ const checkNumber = async (req, res) => {
   const { number: number } = req.params;
 
   const candidate = await Company.find({
-    HRMobile: String(number),
+    "HR.HRMobile": String(number),
   });
   var status = true;
 
