@@ -300,7 +300,7 @@ const bulkInsert = async (req, res) => {
     ordered: false,
     rawResult: true,
   });
-  res.status(StatusCodes.CREATED).json({ success: true });
+  res.status(StatusCodes.CREATED).json({ success: true,employees });
 };
 
 const searchCandidate = async (req, res) => {

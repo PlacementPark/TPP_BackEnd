@@ -218,6 +218,8 @@ const deleteRole = async (req, res) => {
   } = req;
   const company = await Company.findById({ _id: companyId });
   if (!company) throw new NotFoundError("Company not found with given id");
+  const role = await Role.findByIdAndDelete({ _id: roleId });
+  if (!role) throw new NotFoundError("Role not found with given id");
   const updateCompany = await Company.findByIdAndUpdate(
     { _id: companyId },
     {
@@ -225,9 +227,7 @@ const deleteRole = async (req, res) => {
       roles: company._doc.roles.filter((r) => r != roleId),
     }
   );
-  const role = await Role.findByIdAndDelete({ _id: roleId });
-  if (!role) throw new NotFoundError("Role not found with given id");
-  res.status(StatusCodes.OK).json(company);
+  res.status(StatusCodes.OK).json(updateCompany);
 };
 
 const getCompanyUseType = async (req, res) => {
@@ -395,6 +395,7 @@ const updateRole = async (req, res) => {
   }
   res.status(StatusCodes.OK).json(role);
 };
+
 const editCompany = async (req, res) => {
   const {
     params: { id: companyId },
@@ -432,4 +433,5 @@ module.exports = {
   updateRole,
   editCompany,
   checkNumber,
+  deleteRole,
 };
