@@ -37,7 +37,7 @@ const getAllCandidates = async (req, res) => {
   if (awaiting) {
     query = { l1Assessment: ["GOOD", "TAC"], l2Assessment: null };
   }
-  
+
   var candidates = await Candidate.find(query)
     .populate("companyId")
     .populate("roleId")
@@ -156,14 +156,14 @@ const getAssessmentCounts = async (req, res) => {
           $or: [
             {
               l1Assessment: {
-                $in: "NE-Fresher,NI-In-Job,NI-Experienced,NI-Convincing".split(
+                $in: "NE-Fresher,NI-In-Job,NE-Experienced,NI-Convincing".split(
                   ","
                 ),
               },
             },
             {
               l2Assessment: {
-                $in: "NE-Fresher,NI-In-Job,NI-Experienced,NI-Convincing".split(
+                $in: "NE-Fresher,NI-In-Job,NE-Experienced,NI-Convincing".split(
                   ","
                 ),
               },
@@ -300,7 +300,7 @@ const bulkInsert = async (req, res) => {
     ordered: false,
     rawResult: true,
   });
-  res.status(StatusCodes.CREATED).json({ success: true,employees });
+  res.status(StatusCodes.CREATED).json({ success: true, employees });
 };
 
 const searchCandidate = async (req, res) => {
@@ -413,12 +413,12 @@ const getAllByClass = async (req, res) => {
       $or: [
         {
           l1Assessment: {
-            $in: "NE-Fresher,NI-In-Job,NI-Experienced,NI-Convincing".split(","),
+            $in: "NE-Fresher,NI-In-Job,NE-Experienced,NI-Convincing".split(","),
           },
         },
         {
           l2Assessment: {
-            $in: "NE-Fresher,NI-In-Job,NI-Experienced,NI-Convincing".split(","),
+            $in: "NE-Fresher,NI-In-Job,NE-Experienced,NI-Convincing".split(","),
           },
         },
       ],

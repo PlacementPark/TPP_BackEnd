@@ -70,13 +70,6 @@ const candidateSchema = mongoose.Schema({
   },
   select: {
     type: String,
-
-    required: [
-      function () {
-        return this.interviewStatus == "Select";
-      },
-      "You can select if you selected Select in Interview Status",
-    ],
   },
 
   EMP_ID: {
