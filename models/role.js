@@ -22,8 +22,8 @@ const roleSchema = new mongoose.Schema({
     
   },
   experience: {
-    type: Number,
-    default: 0,
+    type: String,
+    
   },
   mandatorySkills: {
     type: [String],

@@ -106,7 +106,7 @@ candidateSchema.pre("save", function (next) {
       { new: true, upsert: true }
     )
       .then(function (count) {
-        doc.candidateId = "CAN" + String(count.seq).padStart(5, "0");
+        doc.candidateId = "CAN" + String(count.seq).padStart(7, "0");
         next();
       })
       .catch(function (error) {
