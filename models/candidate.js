@@ -9,9 +9,23 @@ const candidateSchema = mongoose.Schema({
   mobile: {
     type: [String],
     required: [true, "Please provide Mobile Number"],
+    validate: {
+      validator: function (v) {
+        return /^[6-9]\d{9}$/.test(v);
+      },
+      message: (props) => `${props.value} is not a valid phone number!`,
+    },
     unique: true,
   },
-  email: [String],
+  email: {
+    type: [String],
+    validate: {
+      validator: function (v) {
+        return /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(v);
+      },
+      message: (props) => `${props.value} is not a valid Email!`,
+    },
+  },
   candidateId: String,
   homeTown: {
     type: String,
@@ -78,9 +92,9 @@ const candidateSchema = mongoose.Schema({
   },
   onboardingDate: Date,
   nextTrackingDate: Date,
-  billingDate:Date,
-  invoiceNumber:String,
-  invoiceDate:Date,
+  billingDate: Date,
+  invoiceNumber: String,
+  invoiceDate: Date,
   l1Assessment: {
     type: String,
   },

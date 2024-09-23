@@ -129,6 +129,7 @@ const getAssessmentCounts = async (req, res) => {
     "ProcessRampdown",
     "ClientRampdown",
     "InvoiceProcessed",
+    "BusinessTracking",
     "all",
   ];
   var final = {};
@@ -257,6 +258,12 @@ const getAssessmentCounts = async (req, res) => {
       } else if (type === "NonTenure") {
         query = {
           select: "Non Tenure",
+        };
+      } else if (type === "BusinessTracking") {
+        query = {
+          select: {
+            $in: ["Tracking", "Need to Bill", "Billed", "Invoice Processed"],
+          },
         };
       } else if (type === "ProcessRampdown") {
         query = {
@@ -515,6 +522,12 @@ const getAllByClass = async (req, res) => {
   } else if (type === "N2B") {
     query = {
       select: "Need to Bill",
+    };
+  } else if (type === "BusinessTracking") {
+    query = {
+      select: {
+        $in: ["Tracking", "Need to Bill", "Billed", "Invoice Processed"],
+      },
     };
   } else if (type === "NonTenure") {
     query = {
