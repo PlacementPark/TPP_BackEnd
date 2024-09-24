@@ -11,7 +11,7 @@ const candidateSchema = mongoose.Schema({
     required: [true, "Please provide Mobile Number"],
     validate: {
       validator: function (v) {
-        return /^[6-9]\d{9}$/.test(v);
+        return /d{10}$/.test(v);
       },
       message: (props) => `${props.value} is not a valid phone number!`,
     },
