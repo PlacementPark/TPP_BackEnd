@@ -374,6 +374,8 @@ const assignSearch = async (req, res) => {
   const candidates = await Candidate.find({ ...req.body.query })
     .populate("assignedEmployee")
     .populate("createdByEmployee")
+    .populate("companyId")
+    .populate("roleId")
     .exec();
   res.status(StatusCodes.OK).json({ candidates });
 };
