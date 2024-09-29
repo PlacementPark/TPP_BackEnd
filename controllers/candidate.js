@@ -357,17 +357,24 @@ const getPotentialLeads = async (req, res) => {
 };
 
 const assignRecruiter = async (req, res) => {
-  const { list: list, companyId: companyId, roleId: roleId } = req.body;
+  const { list: list } = req.body;
   var candidates = [];
-  list.forEach(({ emp, part }) => {
-    part.forEach(async (_id) => {
-      const candidate = await Candidate.findByIdAndUpdate(
-        { _id: _id },
-        { assignedEmployee: emp, companyId: companyId, roleId: roleId }
-      );
-      candidates.push(candidate);
-    });
-  });
+  for(let {emp,part} of list){
+    for( let id of part){
+        try {
+          const candidate = await Candidate.findByIdAndUpdate(
+            { _id: id },
+            { assignedEmployee: emp }
+          );
+          candidates.push(candidate);
+          
+        } catch (error) {
+          console.log(id);
+          
+        }
+    }
+    
+  };
   res.status(StatusCodes.OK).json(candidates);
 };
 const assignSearch = async (req, res) => {
