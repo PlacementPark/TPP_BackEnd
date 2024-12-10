@@ -204,7 +204,7 @@ const getAssessmentCounts = async (req, res) => {
       } else if (type === "InterviewScheduled") {
         query = {
           interviewStatus: {
-            $in: "TPP Venue,Client Venue,Pending FSR,Pending Amcat,Pending Versant,Pending Technical,Pending Typing,Pending Group Discussion,Pending Ops/Client,Pending Vice President".split(
+            $in: "Pending FSR,Pending Amcat,Pending Versant,Pending Technical,Pending Typing,Pending Group Discussion,Pending Ops/Client,Pending Vice President".split(
               ","
             ),
           },
@@ -221,7 +221,7 @@ const getAssessmentCounts = async (req, res) => {
         };
       } else if (type === "VirtualInterview") {
         query = {
-          interviewStatus: "Virtual Interview",
+          interviewStatus: "TPP Venue,Client Venue,Virtual Interview",
           select: { $in: ["", null] },
         };
       } else if (type === "OfferDrop") {
