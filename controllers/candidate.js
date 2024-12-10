@@ -221,7 +221,7 @@ const getAssessmentCounts = async (req, res) => {
         };
       } else if (type === "VirtualInterview") {
         query = {
-          interviewStatus: "TPP Venue,Client Venue,Virtual Interview",
+          interviewStatus: {$in:"TPP Venue,Client Venue,Virtual Interview".split(",")},
           select: { $in: ["", null] },
         };
       } else if (type === "OfferDrop") {
@@ -498,7 +498,7 @@ const getAllByClass = async (req, res) => {
     };
   } else if (type === "VirtualInterview") {
     query = {
-      interviewStatus: "TPP Venue,Client Venue,Virtual Interview",
+      interviewStatus: {$in:"TPP Venue,Client Venue,Virtual Interview".split(",")},
       select: { $in: ["", null] },
     };
   } else if (type === "OfferDrop") {
