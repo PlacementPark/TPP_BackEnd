@@ -3,6 +3,7 @@ require("express-async-errors");
 const company = require("./routes/company");
 const employee = require("./routes/employee");
 const candidate = require("./routes/candidate");
+const remarks = require("./routes/remarks")
 const status = require("./routes/status")
 const authMiddle = require("./middleware/authentication");
 const auth = require("./routes/login");
@@ -28,6 +29,7 @@ app.use("/api/v1/candidate", authMiddle, candidate);
 app.use("/api/v1/location", authMiddle, location);
 app.use("/api/v1/skill", authMiddle, skill);
 app.use("/api/v1/extra", authMiddle, extra);
+app.use("/api/v1/remarks", authMiddle, remarks);
 app.use(notFoundMiddleware);
 app.use(errorHandlerMiddleware);
 

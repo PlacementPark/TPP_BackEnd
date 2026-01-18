@@ -46,8 +46,8 @@ const roleSchema = new mongoose.Schema({
     default: "",
   },
   cabFacility: {
-    type: Boolean,
-    default: false,
+    type: String,
+    
   },
   location: {
     type: [String],
@@ -58,7 +58,7 @@ const roleSchema = new mongoose.Schema({
     default: "",
   },
   bond: {
-    type: Number,
+    type: String,
     default: 0,
   },
   ageCriteria: {
@@ -87,6 +87,11 @@ const roleSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  billingTerm:Number,
+  endTrackingDate:Number,
+  industry:String,
+  aboutCompany:String
+
 });
 roleSchema.pre("save", function (next) {
   if ("invalid" == this.name) {

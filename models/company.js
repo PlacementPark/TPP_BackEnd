@@ -29,6 +29,8 @@ const companySchema = new mongoose.Schema({
         "Please provide valid Email",
       ],
     },
+    HRDesignation:String,
+    HRLocation:String
   }],
 
   about: {
@@ -48,6 +50,7 @@ const companySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  paymentTerms:Number,
   roles: {
     type: [
       {
