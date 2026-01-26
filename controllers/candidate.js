@@ -5,6 +5,7 @@ const Role = require("../models/role");
 const Company = require("../models/company");
 const { buildQuery } = require("../utils/candidateHelper");
 const ExcelJS = require("exceljs");
+const Remark = require("../models/remarks");
 const { z } = require("zod");
 
 const addCandidate = async (req, res) => {
@@ -24,7 +25,7 @@ const getCandidate = async (req, res) => {
       .populate("companyId")
       .populate("roleId")
       .populate("assignedEmployee", "_id name")
-      .populate("createdByEmployee","_id name")
+      .populate("createdByEmployee", "_id name")
       .exec();
    if (!candidate) throw new NotFoundError("Candidate with given ID Not Found");
    res.status(StatusCodes.OK).json(candidate);
@@ -43,10 +44,10 @@ const updateCandidate = async (req, res) => {
          new: true,
          runValidators: true,
          context: "query",
-      }
+      },
    )
       .select(
-         "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber remarks select rate"
+         "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber remarks select rate",
       )
       .populate("companyId", "_id companyName ")
       .populate("roleId", "_id role")
@@ -120,12 +121,11 @@ const getAssessmentCounts = async (req, res) => {
 };
 const bulkInsert = async (req, res) => {
    const data = req.body;
-  
-   
+
    const employees = await Candidate.insertMany(data.candidates, {
       ordered: false,
       rawResult: true,
-   }); 
+   });
    res.status(StatusCodes.CREATED).json({ success: true, employees });
 };
 
@@ -140,7 +140,7 @@ const searchCandidate = async (req, res) => {
       query.push({ email: { $regex: ".*" + email + ".*", $options: "i" } });
    const candidates = await Candidate.find({ $or: query })
       .select(
-         "_id createdByEmployee assignedEmployee fullName candidateId mobile l1Assessment l2Assessment interviewStatus "
+         "_id createdByEmployee assignedEmployee fullName candidateId mobile l1Assessment l2Assessment interviewStatus assignedOn createdOn",
       )
       .populate("assignedEmployee", "_id name")
       .populate("createdByEmployee", "_id name");
@@ -188,7 +188,7 @@ const assignRecruiter = async (req, res) => {
          try {
             const candidate = await Candidate.findByIdAndUpdate(
                { _id: id },
-               { assignedEmployee: emp, assignedOn: new Date() }
+               { assignedEmployee: emp, assignedOn: new Date() },
             );
             candidates.push(candidate);
          } catch (error) {
@@ -199,13 +199,38 @@ const assignRecruiter = async (req, res) => {
    res.status(StatusCodes.OK).json(candidates);
 };
 const assignSearch = async (req, res) => {
-   
    const candidates = await Candidate.find({ ...req.body.query })
-      .populate("assignedEmployee")
-      .populate("createdByEmployee")
-      .populate("companyId")
-      .populate("roleId")
+      .select(
+         "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber select rate",
+      ) // removed "remarks" from Candidate select
+      .populate("companyId", "_id companyName")
+      .populate("roleId", "_id role")
+      .populate("assignedEmployee", "_id name")
+      .populate("createdByEmployee", "_id name")
+      .lean()
       .exec();
+   const candidateIds = candidates.map((c) => c._id);
+
+   const remarkDocs = await Remark.find({
+      candidateId: { $in: candidateIds },
+   })
+      .select("candidateId remarks createdAt")
+      .sort({ createdAt: -1 }) // newest -> oldest
+      .lean()
+      .exec();
+
+   const remarksByCandidateId = remarkDocs.reduce((acc, r) => {
+      const key = String(r.candidateId);
+      (acc[key] ||= []).push(r.remarks);
+      return acc;
+   }, {});
+
+   const candidatesWithRemarks = candidates.map((c) => ({
+      ...c,
+      remarks: (remarksByCandidateId[String(c._id)] || []).join("\n"),
+   }));
+
+   res.status(StatusCodes.OK).json({ candidates: candidatesWithRemarks });
    res.status(StatusCodes.OK).json({ candidates });
 };
 const checkNumber = async (req, res) => {
@@ -224,38 +249,53 @@ const checkNumber = async (req, res) => {
 };
 
 const getAllByClass = async (req, res) => {
-   const {
-      companyId: companyId,
-      roleId: roleId,
-      page = 1,
-      limit = 20,
-   } = req.query;
-   const { type: type } = req.params;
-   var query = buildQuery(type);
+   const { page = 1, limit = 20 } = req.query;
+   const { type } = req.params;
+
+   const query = buildQuery(type);
 
    const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
    if (access) query.assignedEmployee = req.user.userid;
 
-   // Pagination
    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-   // Get total count for pagination
    const total = await Candidate.countDocuments(query);
 
+   // Only fetch candidate _id
    const candidates = await Candidate.find(query)
       .select(
-         "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber remarks select rate"
-      )
-      .populate("companyId", "_id companyName ")
+         "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber select rate",
+      ) // removed "remarks" from Candidate select
+      .populate("companyId", "_id companyName")
       .populate("roleId", "_id role")
       .populate("assignedEmployee", "_id name")
       .populate("createdByEmployee", "_id name")
       .skip(skip)
       .limit(parseInt(limit))
+      .lean()
       .exec();
 
+   const candidateIds = candidates.map((c) => c._id);
+
+   // Get remarks newest -> oldest, then concatenate per candidate in that order
+   const remarkDocs = await Remark.find({ candidateId: { $in: candidateIds } })
+      .select("candidateId remarks createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+   const remarksByCandidateId = remarkDocs.reduce((acc, r) => {
+      const key = String(r.candidateId);
+      (acc[key] ||= []).push(r.remarks);
+      return acc;
+   }, {});
+
+   const candidatesWithRemarks = candidates.map((c) => ({
+      ...c,
+      remarks: (remarksByCandidateId[String(c._id)] || []).join("\n"),
+   }));
+
    res.status(StatusCodes.OK).json({
-      candidates,
+      candidates: candidatesWithRemarks,
       total,
       page: parseInt(page),
       totalPages: Math.ceil(total / limit),
@@ -301,11 +341,11 @@ const exportSelectedCandidatesExcel = async (req, res) => {
          .lean();
       res.setHeader(
          "Content-Type",
-         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       res.setHeader(
          "Content-Disposition",
-         `attachment; filename="${name || "candidates"}.xlsx"`
+         `attachment; filename="${name || "candidates"}.xlsx"`,
       );
       // Create workbook and worksheet
       const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res });
@@ -477,5 +517,5 @@ module.exports = {
    getAllByClass,
    getAllByClassOnlyIDs,
    exportSelectedCandidatesExcel,
-   bulkDeleteCandidates
+   bulkDeleteCandidates,
 };

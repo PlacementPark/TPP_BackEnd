@@ -92,7 +92,7 @@ const addCompanyRoles = async (req, res) => {
       const company = await Company.findByIdAndUpdate(
          { _id: companyId },
          { $push: { roles: { $each: roleIDs } } },
-         { new: true, runValidators: true }
+         { new: true, runValidators: true },
       );
       if (!company) throw new NotFoundError("Company not found with given id");
       res.status(StatusCodes.OK).json({ success: true, data: company });
@@ -172,7 +172,7 @@ const getCompany = async (req, res) => {
                joined,
                rejected,
             };
-         })
+         }),
       );
       res.status(StatusCodes.OK).json({
          success: true,
@@ -212,7 +212,7 @@ const deleteRole = async (req, res) => {
       const updateCompany = await Company.findByIdAndUpdate(
          { _id: companyId },
          { $pull: { roles: roleId } },
-         { new: true }
+         { new: true },
       );
       res.status(StatusCodes.OK).json({ success: true, data: updateCompany });
    } catch (error) {
@@ -279,7 +279,7 @@ const getCompanyUseType = async (req, res) => {
                joined,
                rejected,
             };
-         })
+         }),
       );
       res.status(StatusCodes.OK).json({
          success: true,
@@ -360,7 +360,7 @@ const updateRole = async (req, res) => {
       const role = await Role.findByIdAndUpdate(
          { _id: roleId },
          { ...data },
-         { new: true }
+         { new: true },
       );
       if (!role) throw new NotFoundError("Role not found with given id");
       res.status(StatusCodes.OK).json({ success: true, data: role });
@@ -388,7 +388,7 @@ const editCompany = async (req, res) => {
       const upcompany = await Company.findByIdAndUpdate(
          { _id: companyId },
          { ...rest, $pull: { roles: { $in: delrole } } },
-         { new: true, runValidators: true }
+         { new: true, runValidators: true },
       );
       res.status(StatusCodes.OK).json({ success: true, data: upcompany });
    } catch (error) {
@@ -420,6 +420,7 @@ const getCompanyAndRoleNamesForCandidate = async (req, res) => {
 const exportSelectedCompaniesExcel = async (req, res) => {
    try {
       const { ids, name } = req.body;
+
       if (!Array.isArray(ids) || ids.length === 0) {
          return res.status(StatusCodes.BAD_REQUEST).json({
             success: false,
@@ -427,17 +428,13 @@ const exportSelectedCompaniesExcel = async (req, res) => {
          });
       }
 
-      // Fetch companies by IDs, populate roles
-      const companies = await Company.find({ _id: { $in: ids } })
-         .populate("roles", "_id role")
-         .lean();
+      // access = !["Recruiter","Teamlead","Intern"].includes(employeeType)
+      const employeeType = req.user?.employeeType;
+      const access = !["Recruiter", "Teamlead", "Intern"].includes(
+         employeeType,
+      );
 
-      // Create workbook and worksheet
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Companies");
-
-      // Columns based on your actual model
-      worksheet.columns = [
+      const fullColumns = [
          { header: "Company Mongo ID", key: "_id", width: 24 },
          { header: "Company ID", key: "companyId", width: 16 },
          { header: "Company Name", key: "companyName", width: 30 },
@@ -452,8 +449,41 @@ const exportSelectedCompaniesExcel = async (req, res) => {
          { header: "HR Email(s)", key: "HREmails", width: 25 },
       ];
 
+      // Restricted download (Recruiter/Teamlead/Intern)
+      const restrictedColumns = [
+         { header: "Company ID", key: "companyId", width: 16 },
+         { header: "Company Name", key: "companyName", width: 30 },
+         { header: "Company Type", key: "companyType", width: 18 },
+         { header: "Response", key: "response", width: 15 },
+         { header: "Empanelled", key: "empanelled", width: 12 },
+         { header: "Roles", key: "roles", width: 40 },
+      ];
+
+      const columnsToUse = access ? fullColumns : restrictedColumns;
+      const allowedKeys = new Set(columnsToUse.map((c) => c.key));
+
+      // Fetch companies by IDs, populate roles (only what we need)
+      const selectFields = access
+         ? "companyId companyName about companyType remarks response empanelled HR roles"
+         : "companyId companyName companyType response empanelled roles";
+
+      const companies = await Company.find({ _id: { $in: ids } })
+         .select(selectFields)
+         .populate("roles", "_id role")
+         .lean();
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Companies");
+      worksheet.columns = columnsToUse;
+
+      const pickAllowed = (row) => {
+         const out = {};
+         for (const k of allowedKeys) out[k] = row[k];
+         return out;
+      };
+
       companies.forEach((c) => {
-         worksheet.addRow({
+         const baseRow = {
             _id: c._id?.toString() || "",
             companyId: c.companyId || "",
             companyName: c.companyName || "",
@@ -479,7 +509,7 @@ const exportSelectedCompaniesExcel = async (req, res) => {
                ? c.HR.map((hr) =>
                     Array.isArray(hr.HRMobile)
                        ? hr.HRMobile.join(", ")
-                       : hr.HRMobile || ""
+                       : hr.HRMobile || "",
                  )
                     .filter(Boolean)
                     .join(" | ")
@@ -489,16 +519,18 @@ const exportSelectedCompaniesExcel = async (req, res) => {
                     .filter(Boolean)
                     .join(", ")
                : "",
-         });
+         };
+
+         worksheet.addRow(pickAllowed(baseRow));
       });
 
       res.setHeader(
          "Content-Type",
-         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
       res.setHeader(
          "Content-Disposition",
-         `attachment; filename="${name || "companies"}.xlsx"`
+         `attachment; filename="${name || "companies"}.xlsx"`,
       );
 
       await workbook.xlsx.write(res);
@@ -514,16 +546,21 @@ const searchCompany = async (req, res) => {
    const { companyName: name, HRMobile: mobile, HREmail: email } = req.body;
    query = [];
    if (name)
-      query.push({ companyName: { $regex: ".*" + name + ".*", $options: "i" } });
+      query.push({
+         companyName: { $regex: ".*" + name + ".*", $options: "i" },
+      });
    if (mobile)
-      query.push({ "HR.HRMobile": { $regex: ".*" + mobile + ".*", $options: "i" } });
+      query.push({
+         "HR.HRMobile": { $regex: ".*" + mobile + ".*", $options: "i" },
+      });
    if (email)
-      query.push({ "HR.HREmail": { $regex: ".*" + email + ".*", $options: "i" } });
-   const companies = await Company.find({ $or: query })
-      .select(
-         "_id companyName companyId HR remarks empanelled about remarks companyType response empanelled "
-      )
-     
+      query.push({
+         "HR.HREmail": { $regex: ".*" + email + ".*", $options: "i" },
+      });
+   const companies = await Company.find({ $or: query }).select(
+      "_id companyName companyId HR remarks empanelled about remarks companyType response empanelled ",
+   );
+
    res.status(StatusCodes.OK).json(companies);
 };
 
@@ -544,5 +581,5 @@ module.exports = {
    deleteRole,
    getCompanyAndRoleNamesForCandidate,
    exportSelectedCompaniesExcel,
-   searchCompany
+   searchCompany,
 };

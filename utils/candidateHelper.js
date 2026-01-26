@@ -2,7 +2,7 @@ const buildQuery = (type) => {
    switch (type) {
       case "newCandidates":
          return {
-            l1Assessment: { $in: ["", null] },
+            l1Assessment: { $in: ["", null,"DND","Number Not Reachable"] },
             l2Assessment: { $in: ["", null] },
          };
       case "L1L2WrongNumbers":
