@@ -446,10 +446,7 @@ const exportSelectedCandidatesExcel = async (req, res) => {
       worksheet.commit();
       await workbook.commit();
    } catch (error) {
-      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-         success: false,
-         message: error.message,
-      });
+      throw new Error("Failed to export candidates to Excel: " + error.message);
    }
 };
 const bulkDeleteCandidates = async (req, res) => {

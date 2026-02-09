@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const Role = require("../models/role");
 const { StatusCodes } = require("http-status-codes");
 const ExcelJS = require("exceljs");
+const { th } = require("zod/locales");
 // Move status arrays to constants for reuse
 const IN_PROCESS_STATUSES = [
    "TPP Venue",
@@ -534,13 +535,11 @@ const exportSelectedCompaniesExcel = async (req, res) => {
       );
 
       await workbook.xlsx.write(res);
-      res.end();
+      
    } catch (error) {
-      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-         success: false,
-         message: error.message,
-      });
+      throw new Error("Failed to export companies to Excel: " + error.message);
    }
+   res.end();
 };
 const searchCompany = async (req, res) => {
    const { companyName: name, HRMobile: mobile, HREmail: email } = req.body;
