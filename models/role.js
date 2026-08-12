@@ -30,8 +30,8 @@ const roleSchema = new mongoose.Schema({
     default: [],
   },
   optionalSkills: {
-    type: [String],
-    default: [],
+    type: [[String]],
+    default: [[]],
   },
   qualification: {
     type: [String],

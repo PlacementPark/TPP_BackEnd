@@ -3,8 +3,8 @@ require("express-async-errors");
 const company = require("./routes/company");
 const employee = require("./routes/employee");
 const candidate = require("./routes/candidate");
-const remarks = require("./routes/remarks")
-const status = require("./routes/status")
+const remarks = require("./routes/remarks");
+const status = require("./routes/status");
 const authMiddle = require("./middleware/authentication");
 const auth = require("./routes/login");
 const connectDB = require("./db/connect");
@@ -39,7 +39,7 @@ const start = async () => {
   try {
     await connectDB(process.env.MONGO_URL);
     app.listen(port, () =>
-      console.log(`Server is listening on port ${port}...`)
+      console.log(`Server is listening on port ${port}...`),
     );
   } catch (error) {
     console.log(error);

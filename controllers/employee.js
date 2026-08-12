@@ -63,7 +63,8 @@ const updateEmployee = async (req, res) => {
    res.status(StatusCodes.OK).json({ employee });
 };
 const bulkInsert = async (req, res) => {
-   const data = req.body;
+   const data = req.body.employees;
+   console.log(data);
 
    const employees = await Employee.insertMany(data, {
       ordered: false,

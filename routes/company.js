@@ -2,23 +2,25 @@ const express = require("express");
 const router = express.Router();
 
 const {
-   getAllCompanies,
-   addCompany,
-   getRoles,
-   addCompanyRoles,
-   deleteCompany,
-   getCompanyUseType,
-   getCompanyCounts,
-   bulkInsert,
-   getCompany,
-   getRole,
-   updateRole,
-   editCompany,
-   checkNumber,
-   deleteRole,
-   getCompanyAndRoleNamesForCandidate,
-   exportSelectedCompaniesExcel,
-   searchCompany,
+  getAllCompanies,
+  addCompany,
+  getRoles,
+  addCompanyRoles,
+  deleteCompany,
+  getCompanyUseType,
+  getCompanyCounts,
+  bulkInsert,
+  getCompany,
+  getRole,
+  updateRole,
+  editCompany,
+  checkNumber,
+  deleteRole,
+  getCompanyAndRoleNamesForCandidate,
+  exportSelectedRolesExcel,
+  exportSelectedCompaniesExcel,
+  searchCompany,
+  downloadRole,
 } = require("../controllers/company");
 
 router.route("/").get(getAllCompanies).post(addCompany);
@@ -30,10 +32,12 @@ router.route("/candidateCompanyType").get(getCompanyAndRoleNamesForCandidate);
 router.route("/counts").get(getCompanyCounts);
 router.route("/bulkinsert").post(bulkInsert);
 router
-   .route("/:companyId/role/:roleId")
-   .get(getRole)
-   .patch(updateRole)
-   .delete(deleteRole);
+  .route("/:companyId/role/:roleId")
+  .get(getRole)
+  .patch(updateRole)
+  .delete(deleteRole);
+router.route("/:companyId/role/:roleId/download").get(downloadRole);
+router.route("/roles/excelExport").post(exportSelectedRolesExcel);
 router.route("/excelExport").post(exportSelectedCompaniesExcel);
 router.route("/mobile/:number").get(checkNumber);
 router.route("/search").post(searchCompany);

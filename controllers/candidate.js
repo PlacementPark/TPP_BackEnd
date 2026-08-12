@@ -45,14 +45,7 @@ const updateCandidate = async (req, res) => {
       runValidators: true,
       context: "query",
     },
-  )
-    .select(
-      "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber remarks select rate",
-    )
-    .populate("companyId", "_id companyName ")
-    .populate("roleId", "_id role")
-    .populate("assignedEmployee", "_id name")
-    .populate("createdByEmployee", "_id name");
+  );
   if (!candidate) throw new NotFoundError("Candidate with given ID Not Found");
   res.status(StatusCodes.OK).json(candidate);
 };
@@ -120,13 +113,89 @@ const getAssessmentCounts = async (req, res) => {
   });
 };
 const bulkInsert = async (req, res) => {
-  const data = req.body;
+  const { candidates, uploadedFileName } = req.body;
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: "No candidates provided for bulk insert",
+    });
+  }
 
-  const employees = await Candidate.insertMany(data.candidates, {
-    ordered: false,
-    rawResult: true,
+  // Keep a map of temp bulk ids -> remarks for post-insert remark documents
+  const bulkRows = candidates.map((candidate, index) => {
+    const bulkRowId = `bulk-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
+    const trimmedRemarks =
+      typeof candidate.remarks === "string" &&
+      candidate.remarks.trim().length > 0
+        ? candidate.remarks.trim()
+        : null;
+
+    const candidateCopy = {
+      ...candidate,
+      _bulkRowId: bulkRowId,
+      uploadedFileName: uploadedFileName || candidate.uploadedFileName || null,
+      remarks: trimmedRemarks || candidate.remarks || null,
+    };
+
+    return {
+      bulkRowId,
+      remarks: trimmedRemarks,
+      candidateData: candidateCopy,
+    };
   });
-  res.status(StatusCodes.CREATED).json({ success: true, employees });
+
+  const candidatesToInsert = bulkRows.map((row) => row.candidateData);
+
+  let insertedCandidates = [];
+  let bulkError = null;
+  try {
+    insertedCandidates = await Candidate.insertMany(candidatesToInsert, {
+      ordered: false,
+    });
+  } catch (error) {
+    // Continue with inserted docs if some rows failed (ordered: false)
+    if (error.insertedDocs && Array.isArray(error.insertedDocs)) {
+      insertedCandidates = error.insertedDocs;
+      bulkError = error;
+    } else {
+      throw error;
+    }
+  }
+
+  // Map persisted candidate docs to remark texts
+  const remarkDocs = insertedCandidates
+    .map((c) => {
+      const row = bulkRows.find((r) => r.bulkRowId === c._bulkRowId);
+      if (!row || !row.remarks) return null;
+
+      return {
+        candidateId: c._id,
+        remarks: row.remarks,
+        employeeId: req.user?.userid,
+        companyId: c.companyId || undefined,
+      };
+    })
+    .filter(Boolean);
+
+  if (remarkDocs.length > 0) {
+    await Remark.insertMany(remarkDocs, {
+      ordered: false,
+    });
+  }
+
+  // Remove internal tracking field
+  await Candidate.updateMany(
+    { _bulkRowId: { $exists: true } },
+    { $unset: { _bulkRowId: 1 } },
+  );
+
+  res.status(StatusCodes.CREATED).json({
+    success: true,
+    insertedCount: insertedCandidates.length,
+    totalCount: candidates.length,
+    failedCount: candidates.length - insertedCandidates.length,
+    error: bulkError ? bulkError.message : undefined,
+  });
 };
 
 const searchCandidate = async (req, res) => {
@@ -158,18 +227,22 @@ const getPotentialLeads = async (req, res) => {
       { homeTown: { $in: role.location } },
     ],
   };
-  if (role.mandatorySkills.length > 0 && role.optionalSkills.length > 0) {
+  const optionalSkillValues = (role.optionalSkills || [])
+    .flatMap((group) => (Array.isArray(group) ? group : []))
+    .filter(Boolean);
+
+  if (role.mandatorySkills.length > 0 && optionalSkillValues.length > 0) {
     searchquery["skills"] = {
       $all: [...role.mandatorySkills],
-      $in: [...role.optionalSkills],
+      $in: optionalSkillValues,
     };
   } else if (role.mandatorySkills.length > 0)
     searchquery["skills"] = {
       $all: [...role.mandatorySkills],
     };
-  else if (role.optionalSkills.length > 0)
+  else if (optionalSkillValues.length > 0)
     searchquery["skills"] = {
-      $in: [...role.optionalSkills],
+      $in: optionalSkillValues,
     };
   if (query.length > 0) searchquery["$nor"] = query;
 
@@ -199,9 +272,23 @@ const assignRecruiter = async (req, res) => {
   res.status(StatusCodes.OK).json(candidates);
 };
 const assignSearch = async (req, res) => {
+  const remarks =
+    req.body.query["$and"].filter((q) => "remarks" in q)[0]?.remarks || {};
+  req.body.query["$and"] = req.body.query["$and"].filter(
+    (q) => !("remarks" in q),
+  );
+
+  if (Object.keys(remarks).length > 0) {
+    const remarkDocs = await Remark.find({
+      remarks: remarks,
+    }).select("candidateId");
+    const candidateIds = remarkDocs.map((r) => r.candidateId);
+    req.body.query["$and"].push({ _id: { $in: candidateIds } });
+  }
+
   const candidates = await Candidate.find({ ...req.body.query })
     .select(
-      "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber select rate",
+      "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber selectDate offerDropDate select rate homeTown currentCity languages.language experience.companyName experience.role tag source email createdOn lastUpdatedOn assignedOn l1StatDate l2StatDate interviewStatDate tenureStatDate endTrackingDate",
     ) // removed "remarks" from Candidate select
     .populate("companyId", "_id companyName")
     .populate("roleId", "_id role")
@@ -231,7 +318,6 @@ const assignSearch = async (req, res) => {
   }));
 
   res.status(StatusCodes.OK).json({ candidates: candidatesWithRemarks });
-  //res.status(StatusCodes.OK).json({ candidates });
 };
 const checkNumber = async (req, res) => {
   const { number: number } = req.params;
@@ -249,10 +335,11 @@ const checkNumber = async (req, res) => {
 };
 
 const getAllByClass = async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const { companyId, roleId, page = 1, limit = 20 } = req.query;
   const { type } = req.params;
-
-  const query = buildQuery(type);
+  var query = buildQuery(type);
+  if (companyId) query = { ...query, companyId: companyId };
+  if (roleId) query = { ...query, roleId: roleId };
 
   const access = ["Intern", "Recruiter"].includes(req.user.employeeType);
   if (access) query.assignedEmployee = req.user.userid;
@@ -264,8 +351,8 @@ const getAllByClass = async (req, res) => {
   // Only fetch candidate _id
   const candidates = await Candidate.find(query)
     .select(
-      "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber select rate",
-    ) // removed "remarks" from Candidate select
+      "_id createdByEmployee assignedEmployee fullName candidateId mobile email l1Assessment l2Assessment companyId roleId interviewDate interviewStatus onboardingDate nextTrackingDate billingDate invoiceDate invoiceNumber selectDate offerDropDate select rate homeTown currentCity languages.language experience.companyName experience.role tag source email createdOn lastUpdatedOn assignedOn l1StatDate l2StatDate interviewStatDate tenureStatDate endTrackingDate",
+    )
     .populate("companyId", "_id companyName")
     .populate("roleId", "_id role")
     .populate("assignedEmployee", "_id name")
@@ -318,6 +405,54 @@ const getAllByClassOnlyIDs = async (req, res) => {
   const candidates = await Candidate.find(query).select("_id ");
 
   res.status(StatusCodes.OK).json(candidates);
+};
+
+const formatDateForExport = (value) => {
+  if (!value) return "";
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const sanitizeExcelValue = (value) => {
+  if (value === null || value === undefined) return "";
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return formatDateForExport(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(sanitizeExcelValue).join(", ");
+  }
+
+  const stringValue = typeof value === "string" ? value : String(value);
+
+  const sanitized = Array.from(stringValue).filter((char) => {
+    const code = char.codePointAt(0);
+    if (code === undefined) return false;
+
+    return (
+      code === 0x09 ||
+      code === 0x0a ||
+      code === 0x0d ||
+      (code >= 0x20 && code <= 0xd7ff) ||
+      (code >= 0xe000 && code <= 0xfffd) ||
+      (code >= 0x10000 && code <= 0x10ffff)
+    );
+  });
+
+  return sanitized.join("");
 };
 
 // API to export selected candidates to Excel
@@ -387,66 +522,110 @@ const exportSelectedCandidatesExcel = async (req, res) => {
     ];
 
     // Add rows
-    candidates.forEach((c) => {
-      worksheet
-        .addRow({
-          candidateId: c.candidateId || "",
-          fullName: c.fullName || "",
-          mobile: Array.isArray(c.mobile) ? c.mobile.join(", ") : "",
-          email: Array.isArray(c.email) ? c.email.join(", ") : "",
-          homeTown: c.homeTown || "",
-          rate: c.rate ?? "",
-          currentCity: c.currentCity || "",
-          qualifications: Array.isArray(c.qualifications)
+    candidates.forEach((c, index) => {
+      const row = {
+        candidateId: sanitizeExcelValue(c.candidateId || ""),
+        fullName: sanitizeExcelValue(c.fullName || ""),
+        mobile: sanitizeExcelValue(
+          Array.isArray(c.mobile) ? c.mobile.join(", ") : "",
+        ),
+        email: sanitizeExcelValue(
+          Array.isArray(c.email) ? c.email.join(", ") : "",
+        ),
+        homeTown: sanitizeExcelValue(c.homeTown || ""),
+        rate: sanitizeExcelValue(c.rate ?? ""),
+        currentCity: sanitizeExcelValue(c.currentCity || ""),
+        qualifications: sanitizeExcelValue(
+          Array.isArray(c.qualifications)
             ? c.qualifications
                 .map((q) => `${q.qualification || ""} (${q.YOP || ""})`)
                 .join("; ")
             : "",
-          languages: Array.isArray(c.languages)
+        ),
+        languages: sanitizeExcelValue(
+          Array.isArray(c.languages)
             ? c.languages
                 .map((l) => `${l.language || ""} (${l.level || ""})`)
                 .join("; ")
             : "",
-          skills: Array.isArray(c.skills) ? c.skills.join(", ") : "",
-          experience: Array.isArray(c.experience)
+        ),
+        skills: sanitizeExcelValue(
+          Array.isArray(c.skills) ? c.skills.join(", ") : "",
+        ),
+        experience: sanitizeExcelValue(
+          Array.isArray(c.experience)
             ? c.experience
                 .map((e) => `${e.companyName || ""} (${e.role || ""})`)
                 .join("; ")
             : "",
-          companyName: c.companyId?.companyName || "",
-          roleName: c.roleId?.role || "",
-          interviewDate: c.interviewDate
-            ? new Date(c.interviewDate).toLocaleDateString()
-            : "",
-          remarks: c.remarks || "",
-          interviewStatus: c.interviewStatus || "",
-          select: c.select || "",
-          EMP_ID: c.EMP_ID || "",
-          onboardingDate: c.onboardingDate
-            ? new Date(c.onboardingDate).toLocaleDateString()
-            : "",
-          nextTrackingDate: c.nextTrackingDate
-            ? new Date(c.nextTrackingDate).toLocaleDateString()
-            : "",
-          billingDate: c.billingDate
-            ? new Date(c.billingDate).toLocaleDateString()
-            : "",
-          invoiceNumber: c.invoiceNumber || "",
-          invoiceDate: c.invoiceDate
-            ? new Date(c.invoiceDate).toLocaleDateString()
-            : "",
-          l1Assessment: c.l1Assessment || "",
-          l2Assessment: c.l2Assessment || "",
-          assignedEmployeeName: c.assignedEmployee?.name || "",
-          createdByEmployeeName: c.createdByEmployee?.name || "",
-        })
-        .commit();
+        ),
+        companyName: sanitizeExcelValue(c.companyId?.companyName || ""),
+        roleName: sanitizeExcelValue(c.roleId?.role || ""),
+        interviewDate: sanitizeExcelValue(
+          c.interviewDate ? formatDateForExport(c.interviewDate) : "",
+        ),
+        remarks: sanitizeExcelValue(c.remarks || ""),
+        interviewStatus: sanitizeExcelValue(c.interviewStatus || ""),
+        select: sanitizeExcelValue(c.select || ""),
+        EMP_ID: sanitizeExcelValue(c.EMP_ID || ""),
+        onboardingDate: sanitizeExcelValue(
+          c.onboardingDate ? formatDateForExport(c.onboardingDate) : "",
+        ),
+        nextTrackingDate: sanitizeExcelValue(
+          c.nextTrackingDate ? formatDateForExport(c.nextTrackingDate) : "",
+        ),
+        billingDate: sanitizeExcelValue(
+          c.billingDate ? formatDateForExport(c.billingDate) : "",
+        ),
+        invoiceNumber: sanitizeExcelValue(c.invoiceNumber || ""),
+        invoiceDate: sanitizeExcelValue(
+          c.invoiceDate ? formatDateForExport(c.invoiceDate) : "",
+        ),
+        l1Assessment: sanitizeExcelValue(c.l1Assessment || ""),
+        l2Assessment: sanitizeExcelValue(c.l2Assessment || ""),
+        assignedEmployeeName: sanitizeExcelValue(
+          c.assignedEmployee?.name || "",
+        ),
+        createdByEmployeeName: sanitizeExcelValue(
+          c.createdByEmployee?.name || "",
+        ),
+      };
+
+      for (const [fieldName, value] of Object.entries(row)) {
+        if (typeof value === "string") {
+          const invalidChars = Array.from(value).filter((char) => {
+            const code = char.codePointAt(0);
+            return !(
+              code === 0x09 ||
+              code === 0x0a ||
+              code === 0x0d ||
+              (code >= 0x20 && code <= 0xd7ff) ||
+              (code >= 0xe000 && code <= 0xfffd) ||
+              (code >= 0x10000 && code <= 0x10ffff)
+            );
+          });
+
+          if (invalidChars.length > 0) {
+            console.log("Invalid Excel export chars detected", {
+              index,
+              fieldName,
+              value,
+              invalidChars,
+            });
+          }
+        }
+      }
+
+      worksheet.addRow(row).commit();
     });
     // Set response headers for file download
     worksheet.commit();
     await workbook.commit();
   } catch (error) {
-    throw new Error("Failed to export candidates to Excel: " + error.message);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 const bulkDeleteCandidates = async (req, res) => {

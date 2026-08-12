@@ -98,10 +98,10 @@ const buildQuery = (type) => {
             "Reject FSR Stability",
             "Reject FSR Domain",
             "Reject Amcat",
-            "Reject Amcat – Technical Issue",
+            "Reject Amcat - Technical Issue",
             "Reject Amcat Cooling Period",
             "Reject Versant",
-            "Reject Versant – Technical Issue",
+            "Reject Versant - Technical Issue",
             "Reject Versant Cooling Period",
             "Reject Technical",
             "Reject Typing",
@@ -169,7 +169,7 @@ const buildQuery = (type) => {
       return { select: "Process Rampdown" };
     case "ClientRampdown":
       return { select: "Client Rampdown" };
-    case "joined":
+    case "Joined":
       return {
         select: {
           $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
