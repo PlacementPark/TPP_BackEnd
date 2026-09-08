@@ -86,6 +86,13 @@ const buildQuery = (type) => {
             "Pending Re-Versant",
             "Pending Re-Amcat",
             "Pending Client",
+            "TPP Venue",
+            "Client Venue",
+            "TPP Venue-R",
+            "Client Venue-R",
+            "Virtual Interview",
+            "Virtual-R",
+            "Cooling Period",
           ],
         },
         select: { $in: ["", null] },
@@ -172,7 +179,8 @@ const buildQuery = (type) => {
     case "Joined":
       return {
         select: {
-          $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
+          // $in: ["Tracking", "Non tenure", "Need to Bill", "Billed"],
+          $in: ["Billed", "Billed & Tracking", "Billed & Tracking-NR", "Need to Bill", "Invoice Processed", "Replacement & Tracking", "Replacement Done", "Tracking", "Tracking & NR"],
         },
       };
     case "all":
