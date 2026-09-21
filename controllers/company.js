@@ -8,6 +8,36 @@ const { StatusCodes } = require("http-status-codes");
 const ExcelJS = require("exceljs");
 const PDFDocument = require("pdfkit");
 const { getRolePdfData } = require("../utils/rolePdfHelper");
+
+const updateCandidateTrackingDates = async (
+  roleId,
+  billingTerm,
+  endTrackingDate,
+) => {
+  const candidates = await Candidate.find({
+    roleId,
+    onboardingDate: { $ne: null },
+  }).select("_id onboardingDate");
+
+  if (candidates.length === 0) return;
+
+  const updates = candidates.map((candidate) => {
+    const billingDate = new Date(candidate.onboardingDate);
+    billingDate.setDate(billingDate.getDate() + Number(billingTerm || 0));
+
+    const trackingDate = new Date(candidate.onboardingDate);
+    trackingDate.setDate(trackingDate.getDate() + Number(endTrackingDate || 0));
+
+    return {
+      updateOne: {
+        filter: { _id: candidate._id },
+        update: { $set: { billingDate, endTrackingDate: trackingDate } },
+      },
+    };
+  });
+
+  await Candidate.bulkWrite(updates);
+};
 // Move status arrays to constants for reuse
 const IN_PROCESS_STATUSES = [
   "Pending FSR",
@@ -376,6 +406,11 @@ const updateRole = async (req, res) => {
       { new: true },
     );
     if (!role) throw new NotFoundError("Role not found with given id");
+    await updateCandidateTrackingDates(
+      role._id,
+      role.billingTerm,
+      role.endTrackingDate,
+    );
     res.status(StatusCodes.OK).json({ success: true, data: role });
   } catch (error) {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

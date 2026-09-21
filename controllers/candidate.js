@@ -8,8 +8,30 @@ const ExcelJS = require("exceljs");
 const Remark = require("../models/remarks");
 const { z } = require("zod");
 
+const addDays = (date, days) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + Number(days || 0));
+  return result;
+};
+
 const addCandidate = async (req, res) => {
-  const candidate = await Candidate.create({ ...req.body });
+  const candidateData = { ...req.body };
+  if (candidateData.roleId && candidateData.onboardingDate) {
+    const role = await Role.findById(candidateData.roleId).select(
+      "billingTerm endTrackingDate",
+    );
+    if (role) {
+      candidateData.billingDate = addDays(
+        candidateData.onboardingDate,
+        role.billingTerm,
+      );
+      candidateData.endTrackingDate = addDays(
+        candidateData.onboardingDate,
+        role.endTrackingDate,
+      );
+    }
+  }
+  const candidate = await Candidate.create(candidateData);
   res.status(StatusCodes.CREATED).json({
     success: true,
     candidate: candidate,
@@ -33,12 +55,33 @@ const getCandidate = async (req, res) => {
 
 const updateCandidate = async (req, res) => {
   const { id: candidateId } = req.params;
+  const candidateData = { ...req.body };
+  if (candidateData.roleId || candidateData.onboardingDate) {
+    const existingCandidate = await Candidate.findById(candidateId).select(
+      "roleId onboardingDate",
+    );
+    const roleId = candidateData.roleId || existingCandidate?.roleId;
+    const onboardingDate =
+      candidateData.onboardingDate || existingCandidate?.onboardingDate;
+    if (roleId && onboardingDate) {
+      const role = await Role.findById(roleId).select(
+        "billingTerm endTrackingDate",
+      );
+      if (role) {
+        candidateData.billingDate = addDays(onboardingDate, role.billingTerm);
+        candidateData.endTrackingDate = addDays(
+          onboardingDate,
+          role.endTrackingDate,
+        );
+      }
+    }
+  }
   const candidate = await Candidate.findByIdAndUpdate(
     {
       _id: candidateId,
     },
     {
-      ...req.body,
+      ...candidateData,
     },
     {
       new: true,
